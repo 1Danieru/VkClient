@@ -1,0 +1,14 @@
+pyinstaller
+vk_api
+pycryptodome
+sqlite3
+random
+string
+threading
+os
+ctypes
+json
+webbrowser
+requests
+tkinter
+customtkinter
