@@ -7,6 +7,7 @@ import json
 import string
 import threading
 import requests
+import sqlite3
 from Crypto.PublicKey import RSA
 from Crypto.Random import get_random_bytes
 from Crypto.Cipher import AES, PKCS1_OAEP
@@ -51,63 +52,54 @@ class Chat(customtkinter.CTkToplevel):
         self.entry.place(x=10, y=440)
         self.entry.bind('<Return>', self.button_event)
 
-        # Getting information from the database
-        self.db = Database()
-        all_data = self.db.takes_all_data()
-        self.token = all_data[0]
-        self.user_id = all_data[2]
-
-        # Authorization
-        self.session = vk_api.VkApi(token=self.token)
-        self.vk_session = self.session.get_api()
-
-        # Get owner_id
-        # If the "try" block fails, it prints "Wrong token"
+        # If the "try" block fails, it prints "No data. Try to create a new connection."
         try:
-            user_get = self.vk_session.users.get()
-            user_list = user_get[0]
-            self.owner_id = user_list["id"]
-        except:
+            # Getting information from the database
+            self.db = Database()
+            all_data = self.db.takes_all_data()
+            self.token = all_data[0]
+            self.owner_id = all_data[1]
+            self.user_id = all_data[2]
+            self.username = all_data[3]
+
+            # Authorization
+            self.session = vk_api.VkApi(token=self.token)
+            self.vk_session = self.session.get_api()
+
+            # Getting Owner name
+            u_get = self.vk_session.users.get()
+            u_list = u_get[0]
+            self.owner_name = u_list["first_name"]
+
+            # Start a separate thread
+            th = threading.Thread(target=self.listener)
+            th.start()
+        except sqlite3.OperationalError:
             self.text_box.configure(state='normal')
-            self.text_box.insert('end', f'Wrong token')
-            self.text_box.configure(state='disabled')            
-
-        # Get username
-        user_get = self.vk_session.users.get(user_ids=self.user_id)
-        user_list = user_get[0]
-        self.username = user_list["first_name"]
-
-        # Start a separate thread
-        th = threading.Thread(target=self.listener)
-        th.start()
+            self.text_box.insert('end', 'No data. Try to create a new connection.')
+            self.text_box.configure(state='disabled')
+            self.entry.configure(state='disabled')
 
     def button_event(self, *args):
         '''Sends a message to a user
         and transfers information from the "entry" field to the "text_box" field
         '''
 
-        # Getting Owner name
-        u_get = self.vk_session.users.get()
-        u_list = u_get[0]
-        owner_name = u_list["first_name"]
-
         self.text_box.configure(state='normal')
         text_value = str(self.entry.get())
 
         if text_value == '':
-            self.text_box.insert('end', f'{text_value}\n')
-            self.entry.delete(0, 'end')
             self.text_box.configure(state = 'disabled')
         else:
-            t_value = '[' + str(owner_name) + '] ' + text_value
+            t_value = '[' + str(self.owner_name) + '] ' + text_value
 
             # Filename creation
-            data = text_value.encode("utf-8", "ignore")
-            rand_calll = str(''.join(random.choice(string.ascii_letters) for i in range(8)) + '.bin')
+            random_name = str(''.join(random.choice(string.ascii_letters) for i in range(8)) + '.bin')
             o_id_key = str(self.owner_id) + '.pem'
 
             # Message encryption
-            file_out = open(rand_calll, "wb")
+            data = text_value.encode("utf-8", "ignore")
+            file_out = open(random_name, "wb")
             recipient_key = RSA.import_key(open(o_id_key).read())
             session_key = get_random_bytes(16)
             cipher_rsa = PKCS1_OAEP.new(recipient_key)
@@ -119,7 +111,7 @@ class Chat(customtkinter.CTkToplevel):
 
             # Sending a message
             url_mess = self.vk_session.docs.getMessagesUploadServer(peer_id=self.user_id)
-            url_upl = requests.post(url_mess['upload_url'], files={'file' : open(rand_calll, "rb")})
+            url_upl = requests.post(url_mess['upload_url'], files={'file' : open(random_name, "rb")})
             result = json.loads(url_upl.text)
             doc_save = self.vk_session.docs.save(file=result["file"])
             doc_id = doc_save["doc"]
@@ -164,6 +156,7 @@ class Chat(customtkinter.CTkToplevel):
                     att = event.attachments
                     if str(u_id) == str(self.user_id):
                         try:
+                            # Takes url and name of the attachment
                             id_att = att['attach1']
                             gHA = self.vk_session.messages.getHistoryAttachments(peer_id=self.user_id, media_type='doc')
                             ac_key = gHA['items'][0]['attachment']['doc']['access_key']
@@ -181,20 +174,16 @@ class Chat(customtkinter.CTkToplevel):
                                 send_key()
                                 b = True
                             else:
-                                tkinter.messagebox.showinfo(message='names are different.')
+                                ...
                         except:
-                            tkinter.messagebox.showinfo(message='file is missing.')
+                            ...
                     else:
-                        tkinter.messagebox.showinfo(message=f'User {u_id} wrote a message.')
+                        ...
                 except:
-                    tkinter.messagebox.showinfo(message='u_id or att.')
+                    ...
 
             if b is True:
                 break 
-        
-        # Filling in the table
-        db = Database()
-        db.populate_data(token=self.token, owner_id=self.owner_id, user_id=self.user_id, username=self.username)
 
     def listener(self):
         '''Accepts new user's message'''
@@ -210,14 +199,14 @@ class Chat(customtkinter.CTkToplevel):
                             url_att = message_info['items'][0]['attachments'][0]['doc']['url']
 
                             # Filename creation
-                            rand_call = str(''.join(random.choice(string.ascii_letters) for i in range(8)) + '.bin')
+                            random_name = str(''.join(random.choice(string.ascii_letters) for i in range(8)) + '.bin')
 
                             # Download file
                             u_doc = requests.get(url_att)
-                            open(rand_call, "wb").write(u_doc.content)
+                            open(random_name, "wb").write(u_doc.content)
 
                             # Message decryption
-                            file_in = open(rand_call, "rb")
+                            file_in = open(random_name, "rb")
                             private_key = RSA.import_key(open("private.pem").read())
                             enc_session_key, nonce, tag, ciphertext = \
                                 [ file_in.read(x) for x in (private_key.size_in_bytes(), 16, 16, -1) ]
