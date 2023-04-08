@@ -119,7 +119,7 @@ class Chat(customtkinter.CTkToplevel):
             att_file = 'doc' + str(self.owner_id) + '_' + str(doc_id["id"])
             self.vk_session.messages.send(user_id=self.user_id, attachment=att_file, random_id=0)
             
-            self.text_box.insert('end', f'{t_value}')
+            self.text_box.insert('end', f'{t_value}\n')
             self.entry.delete(0, 'end')
             self.text_box.configure(state='disabled')
 
