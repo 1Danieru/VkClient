@@ -24,9 +24,3 @@ class Database:
         '''Takes all data'''
         with self.connection:
             return self.cursor.execute("SELECT * FROM data").fetchone()
-        
-    def add_token_and_user_id(self, token, user_id):
-        '''Puts the token and user_id in the table'''
-        with self.connection:
-            return self.cursor.execute(f"INSERT INTO data VALUES (?, ?, ?, ?)", (token, None, user_id, None))
-        

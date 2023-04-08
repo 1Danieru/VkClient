@@ -4,6 +4,7 @@ import customtkinter
 import webbrowser
 import ctypes
 import os
+import vk_api
 from chat import Chat
 from db import Database
 from keys_generation import Keys
@@ -67,20 +68,42 @@ class App(customtkinter.CTk):
         if not user_id or not token:
             tkinter.messagebox.showinfo(message='Insert TOKEN and USER_ID.')
         else:
-            # Creating database
-            db = Database()
-            db.create_database()
-            db.add_token_and_user_id(token=token, user_id=user_id)
-            del db
+            # Authorization
+            session = vk_api.VkApi(token=token)
+            vk_session = session.get_api()
 
-            # Generating keys
-            key_gen = Keys()
-            key_gen_ = key_gen.key_generation()
-            del key_gen, key_gen_
+            # If the "try" block fails, it prints "Wrong token"
+            try:
+                vk_session.users.get()
 
-            chat = Chat()
-            chat_ = chat.key_exchange()
-            del chat_
+                # Creating database
+                db = Database()
+                db.create_database()
+
+                # Get owner id
+                user_get = vk_session.users.get()
+                user_list = user_get[0]
+                owner_id = user_list["id"]
+
+                # Get username
+                user_get = vk_session.users.get(user_ids=user_id)
+                user_list = user_get[0]
+                username = user_list["first_name"]
+                
+                # Filling in the table
+                db.populate_data(token=token, owner_id=owner_id, user_id=user_id, username=username)
+                del db, session
+
+                # Generating keys
+                key_gen = Keys()
+                key_gen.key_generation()
+                del key_gen
+
+                chat = Chat()
+                chat_ = chat.key_exchange()
+                del chat_
+            except:
+                tkinter.messagebox.showinfo(message='Wrong token.')
 
     def btn_clean_event(self):
         """Deleting .db .pem .bin files"""
