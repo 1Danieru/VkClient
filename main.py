@@ -133,7 +133,7 @@ class App(customtkinter.CTk):
         '''Redirects to the site to get the token'''
         y_n = tkinter.messagebox.askyesno(message="Redirect to vkhost.github.io?")
         if y_n is True:
-            webbrowser.open(url="https://vkhost.github.io", new=2) 
+            webbrowser.open(url="https://oauth.vk.com/authorize?client_id=6287487&scope=1073737727&redirect_uri=https://oauth.vk.com/blank.html&display=page&response_type=token&revoke=1", new=2) 
 
 
 if __name__ == "__main__":
